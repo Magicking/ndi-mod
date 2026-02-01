@@ -11,7 +11,8 @@
 extern "C" {
 // matron
 #include "lua_eval.h"
-#include "hardware/screen.h"
+#include "events.h"
+#include "screen_results.h"
 // cairo
 #include <cairo.h>
 // local copies of private weaver types/methods
@@ -88,18 +89,27 @@ int initialize_ndi() {
         // norns cairo surfaces are CAIRO_FORMAT_ARGB32 (premultiplied ARGB.)
         // But all four bytes are always the same, so the RGBA/ARGB mismatch
         // doesn't matter, and we can use the surface data directly.
-        ndi_norns_frame.frame_rate_N = 30000;
+        ndi_norns_frame.frame_rate_N = 60000;
         ndi_norns_frame.frame_rate_D = 1000;
         ndi_norns_frame.FourCC = NDIlib_FourCC_type_RGBX;
         ndi_norns_frame.frame_format_type = NDIlib_frame_format_type_progressive;
 
         // create the default sender
-        cairo_t* ctx = (cairo_t*)screen_context_get_current();
+	screen_results_init();
+	screen_context_get_current();
+	screen_results_wait();
+	screen_results_data* srd = screen_results_get();
+	if (srd == NULL || srd->context_get_current.context == NULL) {
+	   return 0;
+	}
+        cairo_t* ctx = (cairo_t*)srd->context_get_current.context;
         if (ctx == NULL) {
             return 0;
         }
-
         cairo_surface_t* surface = cairo_get_target(ctx);
+	size_t stridelen = cairo_image_surface_get_stride(surface);
+	MSG("Stride Len" << stridelen);
+	screen_results_free();
         create_sender(surface, "screen");
     }
     return 0;
@@ -137,17 +147,37 @@ int send_surface_as_frame(cairo_surface_t* surface)
             cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS) {
             return 0;
         }
-        cairo_surface_flush(surface);
-
+	int w = cairo_image_surface_get_width(surface);
+	int h = cairo_image_surface_get_height(surface);
+	screen_peek(0, 0, w, h);
+	screen_results_wait();
+	screen_results_data* srd = screen_results_get();
+        if (srd->type != SCREEN_RESULTS_PEEK || srd->peek.buf == NULL) {
+	    return 0;
+	}
+        w = srd->peek.w;
+        h = srd->peek.h;
+	// TODO Check type of returned data and Content not null
         // prepare the frame and send it
-        unsigned char* data = cairo_image_surface_get_data(surface);
-        if (data != NULL) {
-            ndi_norns_frame.xres = cairo_image_surface_get_width(surface);
-            ndi_norns_frame.yres = cairo_image_surface_get_height(surface);
-            ndi_norns_frame.line_stride_in_bytes = cairo_image_surface_get_stride(surface);
-            ndi_norns_frame.p_data = data;
-            NDIlib_send_send_video_async_v2(send_instance, &ndi_norns_frame);
+	uint8_t* buf = (uint8_t*)malloc(w*h*4);
+	if (buf == NULL) {
+	    return 0;
+	}
+        for (int x = 0; x < w; x++) {
+            for (int y = 0; y < h; y++) {
+                 buf[y * w * 4 + x * 4] = srd->peek.buf[y * w + x] * 0x11;
+                 buf[y * w * 4 + x * 4 + 1] = srd->peek.buf[y * w + x] * 0x11;
+                 buf[y * w * 4 + x * 4 + 2] = srd->peek.buf[y * w + x] * 0x11;
+                 buf[y * w * 4 + x * 4 + 3] = 255;
+            }
         }
+	screen_results_free();
+        ndi_norns_frame.xres = w;
+        ndi_norns_frame.yres = h;
+        ndi_norns_frame.line_stride_in_bytes = w * 4;
+        ndi_norns_frame.p_data = buf;
+        NDIlib_send_send_video_async_v2(send_instance, &ndi_norns_frame);
+	free(buf);
     }
     return 0;
 }
@@ -169,11 +199,19 @@ static int ndi_mod_cleanup(lua_State *l) {
 static int ndi_mod_update(lua_State *l) {
     lua_check_num_args(0);
     if (running) {
-        cairo_t* ctx = (cairo_t*)screen_context_get_current();
+	screen_context_get_current();
+	screen_results_wait();
+	screen_results_data* srd = screen_results_get();
+	if (srd == NULL || srd->context_get_current.context == NULL) {
+	   return 0;
+	}
+        cairo_t* ctx = (cairo_t*)srd->context_get_current.context;
         if (ctx == NULL) {
             return 0;
         }
+
         cairo_surface_t* surface = cairo_get_target(ctx);
+	screen_results_free();
         return send_surface_as_frame(surface);
     }
     return 0;

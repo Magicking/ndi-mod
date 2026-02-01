@@ -28,6 +28,7 @@ set(NORNS_SOURCE_PATH "${CMAKE_SOURCE_DIR}/dep/norns")
 
 target_include_directories(lua-extension PUBLIC
   "${NORNS_SOURCE_PATH}/matron/src"
+  "${NORNS_SOURCE_PATH}/matron/src/hardware"
   "${NDI_SDK_PATH}/include"
   "${CMAKE_CURRENT_SOURCE_DIR}"
   "/usr/include/cairo"

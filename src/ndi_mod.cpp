@@ -94,7 +94,7 @@ int initialize_ndi() {
         ndi_norns_frame.frame_format_type = NDIlib_frame_format_type_progressive;
 
         // create the default sender
-        cairo_t* ctx = (cairo_t*)screen_context_get_current();
+        cairo_t* ctx = (cairo_t*)screen_context_get_primary();
         if (ctx == NULL) {
             return 0;
         }
@@ -169,7 +169,7 @@ static int ndi_mod_cleanup(lua_State *l) {
 static int ndi_mod_update(lua_State *l) {
     lua_check_num_args(0);
     if (running) {
-        cairo_t* ctx = (cairo_t*)screen_context_get_current();
+        cairo_t* ctx = (cairo_t*)screen_context_get_primary();
         if (ctx == NULL) {
             return 0;
         }

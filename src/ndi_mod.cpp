@@ -89,7 +89,7 @@ int initialize_ndi() {
         // norns cairo surfaces are CAIRO_FORMAT_ARGB32 (premultiplied ARGB.)
         // But all four bytes are always the same, so the RGBA/ARGB mismatch
         // doesn't matter, and we can use the surface data directly.
-        ndi_norns_frame.frame_rate_N = 60000;
+        ndi_norns_frame.frame_rate_N = 30000;
         ndi_norns_frame.frame_rate_D = 1000;
         ndi_norns_frame.FourCC = NDIlib_FourCC_type_RGBX;
         ndi_norns_frame.frame_format_type = NDIlib_frame_format_type_progressive;
